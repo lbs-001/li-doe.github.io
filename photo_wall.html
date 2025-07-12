@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3d照片表白墙</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+            touch-action: none;
+        }
+
+        body {
+            overflow: hidden;
+            display: flex;
+            perspective: 1000px;
+            background: #111;
+        }
+
+        @property --d {
+            syntax: '<angle>';
+            inherits: true;
+            initial-value: 0deg;
+        }
+
+        .click_me {
+            width: 200px;
+            aspect-ratio: 1;
+            font-size: 30px;
+            color: #fff;
+            background: none;
+            border: none;
+            border-radius: 20px;
+            position: relative;
+            z-index: 0;
+            transition: .3s;
+            cursor: pointer;
+        }
+
+        .click_me:before {
+            content: "";
+            position: absolute;
+            inset: -8px;
+            padding: 8px;
+            border-radius: 28px;
+            background: conic-gradient(from var(--d, 0deg),
+                    #21D4FD,
+                    #0000 30deg 120deg,
+                    #B721FF 150deg 180deg,
+                    #0000 210deg 300deg,
+                    #21D4FD 330deg);
+            -webkit-mask:
+                linear-gradient(#000 0 0) content-box,
+                linear-gradient(#000 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: intersect
+        }
+
+        .click_me:after {
+            content: "";
+            position: absolute;
+            inset: -100px;
+            background:
+                radial-gradient(80px at left 150px top 120px, #21D4FD 98%, #0000),
+                radial-gradient(80px at right 150px bottom 120px, #B721FF 98%, #0000);
+            filter: blur(60px);
+            opacity: .5;
+        }
+
+        .click_me:before,
+        .click_me:after {
+            transition: .5s, 99999s 99999s transform, 99999s 99999s --d;
+        }
+
+        .click_me:hover {
+            box-shadow: 0 0 0 1px #666;
+        }
+
+        .click_me:hover:after {
+            transform: rotate(3600deg);
+            transition: .5s, 60s linear transform;
+        }
+
+        .click_me:hover:before {
+            --d: 3600deg;
+            transition: .5s, 60s linear --d;
+        }
+
+        .click_me:hover:before {
+            background-color: #222;
+        }
+
+        .click_me_shell {
+            margin: 0;
+            display: grid;
+            place-content: center;
+            grid-auto-flow: column;
+            background-color: #1b1b1c;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #dragBox,
+        .spinBox {
+            position: relative;
+            display: flex;
+            margin: auto;
+            transform-style: preserve-3d;
+            transform: rotateX(-10deg);
+        }
+
+        #dragBox {
+            transform: rotateX(-30deg)
+        }
+
+        .spinBox {
+            width: 120px;
+            height: 140px;
+            animation: spin 200s infinite linear;
+        }
+
+        #spinBox2 {
+            position: absolute;
+            top: 120%;
+        }
+
+        #spinBox3 {
+            position: absolute;
+            top: -120%;
+        }
+
+        #dragBox img {
+            transform-style: preserve-3d;
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            box-shadow: 0 0 8px #fff;
+            -webkit-box-reflect: below 10px linear-gradient(transparent, transparent, #0005);
+            cursor: pointer; /* 鼠标悬停显示手型 */
+            transition: box-shadow 0.3s; /* 点击时阴影变化过渡 */
+        }
+
+        #dragBox img:hover {
+            box-shadow: 0 0 15px #fff;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotateY(0deg);
+            }
+
+            to {
+                transform: rotateY(360deg);
+            }
+        }
+
+        /* 新增：照片放大弹窗样式 */
+        .photo-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 9999;
+            display: none; /* 默认隐藏 */
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .photo-modal.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            position: relative;
+            max-width: 90%;
+            max-height: 90%;
+            transform: scale(0.8);
+            transition: transform 0.3s ease;
+        }
+
+        .photo-modal.active .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-img {
+            max-width: 100%;
+            max-height: 80vh;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: -40px;
+            right: -40px;
+            color: white;
+            font-size: 40px;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            transition: background 0.3s;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* 新增：缩放控制按钮 */
+        .zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+        }
+
+        .zoom-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s;
+        }
+
+        .zoom-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="click_me_shell" id="click_me_shell">
+        <audio loop src="img/落在生命里的光-尹昔眠.m4a" id="audio" autoplay preload="auto"></audio>
+        <button class="click_me">Click Me</button>
+    </div>
+    <div id="dragBox">
+        <div class="spinBox" id="spinBox">
+            <img src="img/1.webp">
+            <img src="img/2.webp">
+            <img src="img/3.webp">
+            <img src="img/4.webp">
+            <img src="img/6.webp">
+            <img src="img/7.webp">
+            <img src="img/8.webp">
+            <img src="img/1.webp">
+            <img src="img/2.webp">
+            <img src="img/3.webp">
+            <img src="img/4.webp">
+            <img src="img/6.webp">
+            <img src="img/7.webp">
+            <img src="img/8.webp">
+            <img src="img/1.webp">
+            <img src="img/2.webp">
+            <img src="img/3.webp">
+            <img src="img/4.webp">
+            <img src="img/6.webp">
+            <img src="img/7.webp">
+            <img src="img/8.webp">
+        </div>
+        <div class="spinBox" id="spinBox2">
+            <img src="img/2.webp">
+            <img src="img/3.webp">
+            <img src="img/4.webp">
+            <img src="img/6.webp">
+            <img src="img/7.webp">
+            <img src="img/8.webp">
+            <img src="img/1.webp">
+            <img src="img/2.webp">
+            <img src="img/3.webp">
+            <img src="img/4.webp">
+            <img src="img/6.webp">
+            <img src="img/7.webp">
+            <img src="img/8.webp">
+            <img src="img/1.webp">
+            <img src="img/2.webp">
+            <img src="img/3.webp">
+            <img src="img/4.webp">
+            <img src="img/6.webp">
+            <img src="img/7.webp">
+            <img src="img/8.webp">
+            <img src="img/1.webp">
+        </div>
+        <div class="spinBox" id="spinBox3">
+            <img src="img/3.webp">
+            <img src="img/4.webp">
+            <img src="img/6.webp">
+            <img src="img/7.webp">
+            <img src="img/8.webp">
+            <img src="img/1.webp">
+            <img src="img/2.webp">
+            <img src="img/3.webp">
+            <img src="img/4.webp">
+            <img src="img/6.webp">
+            <img src="img/7.webp">
+            <img src="img/8.webp">
+            <img src="img/1.webp">
+            <img src="img/2.webp">
+            <img src="img/3.webp">
+            <img src="img/4.webp">
+            <img src="img/6.webp">
+            <img src="img/7.webp">
+            <img src="img/8.webp">
+            <img src="img/1.webp">
+            <img src="img/2.webp">
+        </div>
+    </div>
+
+    <!-- 新增：照片放大弹窗 -->
+    <div class="photo-modal" id="photoModal">
+        <div class="modal-content">
+            <img src="" alt="放大的照片" class="modal-img" id="modalImg">
+            <div class="close-btn" id="closeBtn">&times;</div>
+            <!-- 缩放控制按钮 -->
+            <div class="zoom-controls">
+                <button class="zoom-btn" id="zoomOut">-</button>
+                <button class="zoom-btn" id="zoomIn">+</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let radius = 560;
+        let outDom = document.getElementById("dragBox");
+        outDom.style.display = 'none';
+
+        let spinDom = document.getElementById("spinBox");
+        let spinDom2 = document.getElementById("spinBox2");
+        let spinDom3 = document.getElementById("spinBox3");
+
+        let aImg = spinDom.getElementsByTagName('img');
+        let aImg2 = spinDom2.getElementsByTagName('img');
+        let aImg3 = spinDom3.getElementsByTagName('img');
+
+        let aEle = [...aImg];
+        let aEle2 = [...aImg2];
+        let aEle3 = [...aImg3];
+
+        function setStyle(delayTime, dom, i, len) {
+            dom.style.transform = "rotateY(" + (i * (360 / len)) + "deg) translateZ(" + radius + "px)";
+            dom.style.transition = "transform 1s";
+            dom.style.transitionDelay = delayTime || (len - i) / 4 + "s";
+        }
+
+        function init(delayTime) {
+            for (let i = 0; i < aEle.length; i++) {
+                setStyle(delayTime, aEle[i], i, aEle.length)
+            }
+            for (let i = 0; i < aEle2.length; i++) {
+                setStyle(delayTime, aEle2[i], i, aEle2.length)
+            }
+            for (let i = 0; i < aEle3.length; i++) {
+                setStyle(delayTime, aEle3[i], i, aEle3.length)
+            }
+
+            // 为所有图片绑定点击事件（初始化时绑定）
+            bindImageClickEvents();
+        }
+
+        let click_me_shell = document.getElementById("click_me_shell")
+        click_me_shell.onclick = () => {
+            outDom.style.display = '';
+            click_me_shell.style.display = 'none';
+            let audio = document.getElementById('audio');
+            audio.play();
+            
+            // 心形粒子效果
+            ! function (e, t, a) {
+                function r() {
+                    for (var e = 0; e < s.length; e++) s[e].alpha <= 0 ? (t.body.removeChild(s[e].el), s.splice(e, 1)) : (s[e].y--, s[e].scale += .004, s[e].alpha -= .013, s[e].el.style.cssText = "left:" + s[e].x + "px;top:" + s[e].y + "px;opacity:" + s[e].alpha + ";transform:scale(" + s[e].scale + "," + s[e].scale + ") rotate(45deg);background:" + s[e].color + ";z-index:99999");
+                    requestAnimationFrame(r)
+                }
+                function n() {
+                    var t = "function" == typeof e.onclick && e.onclick;
+                    e.onclick = function (e) {
+                        t && t(), o(e)
+                    }
+                }
+                function o(e) {
+                    var a = t.createElement("div");
+                    a.className = "heart", s.push({
+                        el: a,
+                        x: e.clientX - 5,
+                        y: e.clientY - 5,
+                        scale: 1,
+                        alpha: 1,
+                        color: c()
+                    }), t.body.appendChild(a)
+                }
+                function i(e) {
+                    var a = t.createElement("style");
+                    a.type = "text/css";
+                    try {
+                        a.appendChild(t.createTextNode(e))
+                    } catch (t) {
+                        a.styleSheet.cssText = e
+                    }
+                    t.getElementsByTagName("head")[0].appendChild(a)
+                }
+                function c() {
+                    return "rgb(" + ~~(255 * Math.random()) + "," + ~~(255 * Math.random()) + "," + ~~(255 * Math.random()) + ")"
+                }
+                var s = [];
+                e.requestAnimationFrame = e.requestAnimationFrame || e.webkitRequestAnimationFrame || e.mozRequestAnimationFrame || e.oRequestAnimationFrame || e.msRequestAnimationFrame || function (e) {
+                    setTimeout(e, 1e3 / 60)
+                }, i(
+                    ".heart{width: 10px;height: 10px;position: fixed;background: #f00;transform: rotate(45deg);-webkit-transform: rotate(45deg);-moz-transform: rotate(45deg);}.heart:after,.heart:before{content: '';width: inherit;height: inherit;background: inherit;border-radius: 50%;-webkit-border-radius: 50%;-moz-border-radius: 50%;position: fixed;}.heart:after{top: -5px;}.heart:before{left: -5px;}"
+                ), n(), r()
+            }(window, document);
+
+            setTimeout(init, 1000);
+        }
+
+        // 鼠标滚动调整相册大小
+        document.onmousewheel = function (e) {
+            e || e.window.event;
+            let d = e.wheelDelta / 20 || -e.detail;
+            radius += d;
+            init(1);
+        }
+
+        // 自动旋转控制
+        function playSpin(yes) {
+            spinDom.style.animationPlayState = (yes ? 'running' : 'paused');
+            spinDom2.style.animationPlayState = (yes ? 'running' : 'paused');
+            spinDom3.style.animationPlayState = (yes ? 'running' : 'paused');
+        }
+
+        // 旋转角度控制
+        function changeRotate(obj) {
+            if (tY > 180) tY = 180;
+            if (tY < 0) tY = 0;
+            obj.style.transform = "rotateX(" + (-tY) + "deg) rotateY(" + (tX) + "deg)";
+        }
+
+        let startX, startY, endX, endY, tX = 0, tY = 10, desX = 0, desY = 0;
+
+        // 鼠标拖拽旋转
+        document.onpointerdown = function (e) {
+            clearInterval(outDom.timer);
+            e = e || ewindow.event;
+            startX = e.clientX, startY = e.clientY;
+            this.onpointermove = function (e) {
+                playSpin(false);
+                e = e || window.event;
+                endX = e.clientX, endY = e.clientY;
+                desX = endX - startX;
+                desY = endY - startY;
+                tX += desX * 0.1;
+                tY += desY * 0.1;
+                changeRotate(outDom);
+                startX = endX;
+                startY = endY;
+            }
+            this.onpointerup = function (e) {
+                outDom.timer = setInterval(function () {
+                    desX *= 0.95;
+                    desY *= 0.95;
+                    tX += desX * 0.1;
+                    tY += desY * 0.1;
+                    changeRotate(outDom);
+                    playSpin(false);
+                    if (Math.abs(desX) < 0.5 && Math.abs(desY) < 0.5) {
+                        clearInterval(outDom.timer);
+                        playSpin(true);
+                    }
+                })
+                this.onpointermove = this.onpointerup = null;
+            }
+            return false;
+        }
+
+        // 新增：照片放大功能逻辑
+        const photoModal = document.getElementById('photoModal');
+        const modalImg = document.getElementById('modalImg');
+        const closeBtn = document.getElementById('closeBtn');
+        const zoomIn = document.getElementById('zoomIn');
+        const zoomOut = document.getElementById('zoomOut');
+        let currentScale = 1; // 初始缩放比例
+
+        // 为所有图片绑定点击事件
+        function bindImageClickEvents() {
+            const allImages = [...aEle, ...aEle2, ...aEle3];
+            allImages.forEach(img => {
+                img.addEventListener('click', function (e) {
+                    e.stopPropagation(); // 阻止事件冒泡，避免触发页面点击的心形效果
+                    const imgSrc = this.src;
+                    modalImg.src = imgSrc;
+                    photoModal.classList.add('active');
+                    currentScale = 1; // 重置缩放比例
+                    modalImg.style.transform = `scale(${currentScale})`;
+                    playSpin(false); // 打开弹窗时暂停旋转
+                });
+            });
+        }
+
+        // 关闭弹窗
+        function closeModal() {
+            photoModal.classList.remove('active');
+            playSpin(true); // 关闭弹窗后恢复旋转
+        }
+
+        closeBtn.addEventListener('click', closeModal);
+        photoModal.addEventListener('click', function (e) {
+            // 点击弹窗背景关闭
+            if (e.target === photoModal) {
+                closeModal();
+            }
+        });
+
+        // 缩放功能
+        zoomIn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (currentScale < 3) { // 最大放大到3倍
+                currentScale += 0.2;
+                modalImg.style.transform = `scale(${currentScale})`;
+            }
+        });
+
+        zoomOut.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (currentScale > 0.5) { // 最小缩小到0.5倍
+                currentScale -= 0.2;
+                modalImg.style.transform = `scale(${currentScale})`;
+            }
+        });
+
+        // 键盘ESC关闭弹窗
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && photoModal.classList.contains('active')) {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>
